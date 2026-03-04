@@ -1,0 +1,8 @@
+.env
+credentials/
+__pycache__/
+*.pyc
+state.json
+*.egg-info/
+.venv/
+venv/
