@@ -1,17 +1,20 @@
 """Gmail API client — authenticates, fetches, and marks emails."""
 import base64
-import json
-import os
+import time
 from datetime import datetime, timezone
-from email import message_from_bytes
 from pathlib import Path
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 
 import config
+from retry import with_backoff
+
+# Gmail API quota: 250 units/user/second; messages.get = 5 units → safe at ~1 req/s
+_GMAIL_INTER_REQUEST_DELAY = 0.2   # seconds between individual message fetches
 
 SCOPES = [
     "https://www.googleapis.com/auth/gmail.readonly",
@@ -96,26 +99,30 @@ def fetch_emails(since_epoch: int | None = None) -> list[dict]:
         ids += [m["id"] for m in resp.get("messages", [])]
         request = messages_resource.list_next(request, resp)
 
-    emails = []
-    for msg_id in ids:
-        raw = messages_resource.get(userId="me", id=msg_id, format="full").execute()
-
+    @with_backoff(exceptions=(HttpError,), retries=4, base_delay=2.0)
+    def _fetch_one(msg_id: str) -> dict:
+        raw     = messages_resource.get(userId="me", id=msg_id, format="full").execute()
         headers = {h["name"]: h["value"] for h in raw["payload"].get("headers", [])}
         body    = _decode_body(raw["payload"])
-
-        emails.append({
+        return {
             "id":        msg_id,
             "thread_id": raw.get("threadId"),
             "subject":   headers.get("Subject", "(no subject)"),
             "sender":    headers.get("From", "unknown"),
             "date":      headers.get("Date", ""),
             "snippet":   raw.get("snippet", ""),
-            "body":      body[:4000],   # cap at 4 000 chars per email
-        })
+            "body":      body[:4000],
+        }
+
+    emails = []
+    for msg_id in ids:
+        emails.append(_fetch_one(msg_id))
+        time.sleep(_GMAIL_INTER_REQUEST_DELAY)   # respect quota burst limit
 
     return emails
 
 
+@with_backoff(exceptions=(HttpError,), retries=4, base_delay=2.0)
 def mark_as_read(message_ids: list[str]) -> None:
     """Remove the UNREAD label from the given message IDs."""
     if not message_ids:

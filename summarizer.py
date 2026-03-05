@@ -1,7 +1,8 @@
 """AI summarization via OpenRouter (OpenAI-compatible API)."""
-from openai import OpenAI
+from openai import OpenAI, RateLimitError, APIStatusError, APIConnectionError
 
 import config
+from retry import with_backoff
 
 _client = OpenAI(
     api_key=config.OPENROUTER_API_KEY,
@@ -18,6 +19,12 @@ Group them by category if possible (News, Work, Newsletters, Personal, etc.).
 Be factual. Do not invent information. Use plain English."""
 
 
+@with_backoff(
+    exceptions=(RateLimitError, APIStatusError, APIConnectionError),
+    retries=4,
+    base_delay=5.0,   # OpenRouter rate limits warrant a longer initial wait
+    max_delay=120.0,
+)
 def summarize_emails(emails: list[dict]) -> str:
     """
     Given a list of email dicts (subject, sender, date, body),

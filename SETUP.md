@@ -6,6 +6,45 @@ via OpenRouter, and delivers a clean HTML digest newsletter **twice a week** via
 
 ---
 
+## 0. Clone the repository
+
+```bash
+git clone https://github.com/YOUR_USERNAME/EmailBot.git
+cd EmailBot
+```
+
+> Replace `YOUR_USERNAME/EmailBot` with your actual repository path.
+
+### Set up a virtual environment (recommended)
+
+**macOS / Linux / WSL**
+```bash
+python -m venv .venv
+source .venv/bin/activate
+```
+
+**Windows (Command Prompt / PowerShell)**
+```bash
+python -m venv .venv
+.venv\Scripts\activate
+```
+
+You should see `(.venv)` in your prompt. All subsequent `pip` and `python` commands
+run inside this isolated environment.
+
+### After cloning — what is NOT in the repo
+
+These files are git-ignored and must be created manually:
+
+| File | Why missing | What to do |
+|---|---|---|
+| `.env` | Contains secrets | Copy `.env.example` → `.env`, fill in values |
+| `credentials/credentials.json` | Google OAuth secret | Download from Google Cloud Console (Step 2) |
+| `credentials/token.json` | Auto-generated | Created on first run after OAuth consent |
+| `state.json` | Runtime state | Created automatically on first run |
+
+---
+
 ## 1. Install dependencies
 
 ```bash

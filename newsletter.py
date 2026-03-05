@@ -8,6 +8,7 @@ from email.mime.text import MIMEText
 from jinja2 import Template
 
 import config
+from retry import with_backoff
 
 # ── HTML template ──────────────────────────────────────────────────────────────
 _HTML_TEMPLATE = Template("""
@@ -99,6 +100,12 @@ def _markdown_to_html(md: str) -> str:
     return result
 
 
+@with_backoff(
+    exceptions=(smtplib.SMTPException, OSError, ConnectionError),
+    retries=3,
+    base_delay=10.0,  # SMTP servers typically enforce a cooldown before retry
+    max_delay=60.0,
+)
 def build_and_send(
     emails: list[dict],
     summary_md: str,
